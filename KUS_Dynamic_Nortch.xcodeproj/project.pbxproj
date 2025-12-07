@@ -12,6 +12,7 @@
 		A9F4A2152EE5F735000A0C7D /* KUDynamicNotchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F4A2142EE5F735000A0C7D /* KUDynamicNotchApp.swift */; };
 		A9F4A2172EE5F744000A0C7D /* MediaObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F4A2162EE5F744000A0C7D /* MediaObserver.swift */; };
 		A9F4A2192EE5F754000A0C7D /* ShuttleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F4A2182EE5F754000A0C7D /* ShuttleManager.swift */; };
+		A9F4A21B2EE5F765000A0C7D /* TrayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F4A21A2EE5F765000A0C7D /* TrayManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -39,7 +40,8 @@
 		A9F4A2142EE5F735000A0C7D /* KUDynamicNotchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KUDynamicNotchApp.swift; sourceTree = "<group>"; };
 		A9F4A2162EE5F744000A0C7D /* MediaObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaObserver.swift; sourceTree = "<group>"; };
 		A9F4A2182EE5F754000A0C7D /* ShuttleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShuttleManager.swift; sourceTree = "<group>"; };
-		A9F4A21A2EE5F7E1000A0C7D /* KUS_Dynamic_Nortch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KUS_Dynamic_Nortch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A9F4A21A2EE5F765000A0C7D /* TrayManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrayManager.swift; sourceTree = "<group>"; };
+		A9F4A21C2EE5F7E1000A0C7D /* KUS_Dynamic_Nortch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KUS_Dynamic_Nortch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -75,7 +77,8 @@
 				A9F4A2142EE5F735000A0C7D /* KUDynamicNotchApp.swift */,
 				A9F4A2162EE5F744000A0C7D /* MediaObserver.swift */,
 				A9F4A2182EE5F754000A0C7D /* ShuttleManager.swift */,
-				A9F4A21A2EE5F7E1000A0C7D /* KUS_Dynamic_Nortch.app */,
+				A9F4A21A2EE5F765000A0C7D /* TrayManager.swift */,
+				A9F4A21C2EE5F7E1000A0C7D /* KUS_Dynamic_Nortch.app */,
 			);
 			sourceTree = "<group>";
 		};
@@ -98,7 +101,7 @@
 			packageProductDependencies = (
 			);
 			productName = KUS_Dynamic_Nortch;
-			productReference = A9F4A21A2EE5F7E1000A0C7D /* KUS_Dynamic_Nortch.app */;
+			productReference = A9F4A21C2EE5F7E1000A0C7D /* KUS_Dynamic_Nortch.app */;
 			productType = "com.apple.product-type.application";
 		};
 		A9F4A1EC2EE5F6B4000A0C7D /* KUS_Dynamic_NortchTests */ = {
@@ -220,6 +223,7 @@
 				A9F4A2152EE5F735000A0C7D /* KUDynamicNotchApp.swift in Sources */,
 				A9F4A2172EE5F744000A0C7D /* MediaObserver.swift in Sources */,
 				A9F4A2112EE5F715000A0C7D /* ContentView.swift in Sources */,
+				A9F4A21B2EE5F765000A0C7D /* TrayManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
