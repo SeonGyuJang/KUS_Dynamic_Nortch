@@ -9,20 +9,23 @@ enum NotchTab: String, CaseIterable {
 
 struct ContentView: View {
     @StateObject var mediaObserver = MediaObserver()
+    @StateObject var settingsManager = SettingsManager()
     @State private var isExpanded = false
     @State private var isHovering = false
     @State private var selectedTab: NotchTab = .app
-    
+    @State private var showSettings = false
+    @State private var isDraggingOverCompact = false
+
     // 자연스러운 형태 변형을 위한 네임스페이스
     @Namespace private var animation
     
-    // NotchNook 스타일의 확장 애니메이션 - 더 유기적이고 자연스럽게
+    // NotchNook 스타일의 확장 애니메이션 - Dynamic Island처럼 더 유기적이고 자연스럽게
     var expandAnimation: Animation {
-        .interpolatingSpring(mass: 1.0, stiffness: 180, damping: 20, initialVelocity: 0)
+        .interpolatingSpring(mass: 0.7, stiffness: 170, damping: 18, initialVelocity: 1.5)
     }
 
     var collapseAnimation: Animation {
-        .interpolatingSpring(mass: 0.8, stiffness: 200, damping: 22, initialVelocity: 0)
+        .interpolatingSpring(mass: 0.6, stiffness: 190, damping: 20, initialVelocity: 0.5)
     }
 
     var contentFadeAnimation: Animation {
@@ -44,16 +47,23 @@ struct ContentView: View {
                         RoundedRectangle(cornerRadius: 32, style: .continuous)
                             .fill(Color.black) // 배경은 무조건 검은색
                             .matchedGeometryEffect(id: "Background", in: animation)
-                            .frame(width: 500, height: 280)
+                            .frame(width: settingsManager.notchWidth, height: settingsManager.notchHeight)
                             .shadow(color: .black.opacity(0.5), radius: 30, x: 0, y: 15)
                     } else {
                         // 축소 상태: 알약 모양
                         if mediaObserver.isPlaying {
                             Capsule()
-                                .fill(Color.black)
+                                .fill(isDraggingOverCompact ? Color.blue.opacity(0.2) : Color.black)
                                 .matchedGeometryEffect(id: "Background", in: animation)
                                 .frame(width: 220, height: 36)
                                 .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
+                                .overlay(
+                                    Capsule()
+                                        .strokeBorder(
+                                            isDraggingOverCompact ? Color.blue.opacity(0.8) : Color.clear,
+                                            style: StrokeStyle(lineWidth: 2, dash: [8, 4])
+                                        )
+                                )
                         } else {
                             Capsule()
                                 .fill(Color.black)
@@ -85,6 +95,7 @@ struct ContentView: View {
                         ExpandedDashboard(
                             isExpanded: $isExpanded,
                             selectedTab: $selectedTab,
+                            showSettings: $showSettings,
                             media: mediaObserver,
                             animation: animation
                         )
@@ -97,20 +108,28 @@ struct ContentView: View {
                             )
                         )
                     } else {
-                        CompactBar(media: mediaObserver, animation: animation)
-                            .transition(
-                                .asymmetric(
-                                    insertion: .opacity
-                                        .animation(.easeIn(duration: 0.2)),
-                                    removal: .opacity
-                                        .animation(.easeOut(duration: 0.1))
-                                )
+                        CompactBar(
+                            media: mediaObserver,
+                            animation: animation,
+                            isDraggingOver: isDraggingOverCompact
+                        )
+                        .transition(
+                            .asymmetric(
+                                insertion: .opacity
+                                    .animation(.easeIn(duration: 0.2)),
+                                removal: .opacity
+                                    .animation(.easeOut(duration: 0.1))
                             )
+                        )
+                        .onDrop(of: [.fileURL], isTargeted: $isDraggingOverCompact) { providers in
+                            handleCompactDrop(providers: providers)
+                            return true
+                        }
                     }
                 }
                 .frame(
-                    width: isExpanded ? 500 : (mediaObserver.isPlaying ? 220 : 140),
-                    height: isExpanded ? 280 : (mediaObserver.isPlaying ? 36 : 30)
+                    width: isExpanded ? settingsManager.notchWidth : (mediaObserver.isPlaying ? 220 : 140),
+                    height: isExpanded ? settingsManager.notchHeight : (mediaObserver.isPlaying ? 36 : 30)
                 )
                 
                 // ---------------------------------------------------------
@@ -119,8 +138,8 @@ struct ContentView: View {
                 Color.clear
                     .contentShape(Rectangle())
                     .frame(
-                        width: isExpanded ? 500 : (mediaObserver.isPlaying ? 220 : 140),
-                        height: isExpanded ? 280 : 36
+                        width: isExpanded ? settingsManager.notchWidth : (mediaObserver.isPlaying ? 220 : 140),
+                        height: isExpanded ? settingsManager.notchHeight : 36
                     )
                     .onTapGesture {
                         let targetAnimation = isExpanded ? collapseAnimation : expandAnimation
@@ -153,6 +172,36 @@ struct ContentView: View {
             Spacer()
         }
         .padding(.top, 0)
+        .sheet(isPresented: $showSettings) {
+            SettingsView(settingsManager: settingsManager, isPresented: $showSettings)
+        }
+    }
+
+    // 압축 상태에서 파일 드롭 시 자동으로 트레이 열기
+    private func handleCompactDrop(providers: [NSItemProvider]) -> Bool {
+        withAnimation(expandAnimation) {
+            isExpanded = true
+            selectedTab = .tray
+        }
+
+        // 트레이 매니저를 통해 파일 추가 (약간의 딜레이로 애니메이션 완료 후 추가)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            for provider in providers {
+                _ = provider.loadObject(ofClass: URL.self) { url, error in
+                    if let url = url {
+                        DispatchQueue.main.async {
+                            // NotificationCenter를 통해 TrayView에 파일 추가 알림
+                            NotificationCenter.default.post(
+                                name: NSNotification.Name("AddFileToTray"),
+                                object: nil,
+                                userInfo: ["url": url]
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        return true
     }
 }
 
@@ -160,10 +209,19 @@ struct ContentView: View {
 struct CompactBar: View {
     @ObservedObject var media: MediaObserver
     var animation: Namespace.ID
-    
+    var isDraggingOver: Bool = false
+
     var body: some View {
         HStack(spacing: 12) {
-            if media.isPlaying {
+            if isDraggingOver {
+                // 드래그 중일 때 트레이 아이콘 표시
+                Image(systemName: "tray.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.blue)
+                Text("파일을 놓으면 트레이가 열립니다")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white)
+            } else if media.isPlaying {
                 // 앨범 아트
                 if let data = media.artworkData, let nsImage = NSImage(data: data) {
                     Image(nsImage: nsImage).resizable().aspectRatio(contentMode: .fill)
@@ -198,8 +256,10 @@ struct CompactBar: View {
 struct ExpandedDashboard: View {
     @Binding var isExpanded: Bool
     @Binding var selectedTab: NotchTab
+    @Binding var showSettings: Bool
     @ObservedObject var media: MediaObserver
     var animation: Namespace.ID
+    @State private var isSettingsHovering = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -226,6 +286,26 @@ struct ExpandedDashboard: View {
                     }
                 }
                 Spacer()
+
+                // 설정 버튼 추가
+                Button(action: {
+                    showSettings = true
+                }) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(isSettingsHovering ? .white : .gray.opacity(0.7))
+                        .padding(8)
+                        .background(
+                            Circle()
+                                .fill(isSettingsHovering ? Color.white.opacity(0.15) : Color.clear)
+                        )
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        isSettingsHovering = hovering
+                    }
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 16)
@@ -338,8 +418,8 @@ struct KUWidgetView: View {
     let kuRed = Color(red: 152/255, green: 30/255, blue: 50/255)
 
     var body: some View {
-        VStack(spacing: 14) {
-            // 메인 셔틀버스 카드 - 가시성 최우선
+        VStack(spacing: 12) {
+            // 메인 셔틀버스 카드 - 가시성 최우선, 완벽한 여백 조정
             ZStack {
                 // 배경 그라데이션
                 LinearGradient(
@@ -347,17 +427,17 @@ struct KUWidgetView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                .cornerRadius(20)
-                .shadow(color: kuRed.opacity(0.3), radius: 12, x: 0, y: 6)
+                .cornerRadius(18)
+                .shadow(color: kuRed.opacity(0.25), radius: 10, x: 0, y: 4)
 
-                VStack(spacing: 12) {
+                VStack(spacing: 0) {
                     // 상단: 아이콘 + 방향 선택
                     HStack {
                         // 버스 아이콘
                         Image(systemName: "bus.fill")
-                            .font(.system(size: 22, weight: .semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(.white)
-                            .padding(10)
+                            .padding(9)
                             .background(Color.white.opacity(0.2))
                             .clipShape(Circle())
 
@@ -395,63 +475,63 @@ struct KUWidgetView: View {
                         } label: {
                             HStack(spacing: 4) {
                                 Text(direction == .toStation ? "조치원역 방면" : "학교 방면")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(size: 12, weight: .semibold))
                                 Image(systemName: "chevron.down")
-                                    .font(.system(size: 10, weight: .semibold))
+                                    .font(.system(size: 9, weight: .semibold))
                             }
                             .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 6)
                             .background(Color.white.opacity(0.2))
-                            .cornerRadius(20)
+                            .cornerRadius(18)
                         }
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 18)
-
-                    Spacer()
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
+                    .padding(.bottom, 8)
 
                     // 중앙: 남은 시간 (매우 크고 명확하게)
                     if shuttleManager.isServiceEnded {
-                        VStack(spacing: 4) {
+                        VStack(spacing: 3) {
                             Text("운행종료")
-                                .font(.system(size: 36, weight: .bold, design: .rounded))
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
                             Text("내일 첫차를 이용해주세요")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.white.opacity(0.8))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.75))
                         }
+                        .frame(maxHeight: .infinity)
                     } else {
-                        VStack(spacing: 2) {
-                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        VStack(spacing: 1) {
+                            HStack(alignment: .firstTextBaseline, spacing: 5) {
                                 Text(shuttleManager.timeRemaining.replacingOccurrences(of: "분", with: ""))
-                                    .font(.system(size: 64, weight: .bold, design: .rounded))
+                                    .font(.system(size: 56, weight: .bold, design: .rounded))
                                     .foregroundColor(.white)
                                 if shuttleManager.timeRemaining.contains("분") {
                                     Text("분")
-                                        .font(.system(size: 28, weight: .semibold))
+                                        .font(.system(size: 24, weight: .semibold))
                                         .foregroundColor(.white.opacity(0.9))
                                 }
                             }
                             Text("\(shuttleManager.nextBusTime) 출발")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(.white.opacity(0.85))
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                                .padding(.top, 2)
                         }
+                        .frame(maxHeight: .infinity)
                     }
-
-                    Spacer()
 
                     // 하단: 세종캠퍼스 라벨
                     Text("세종캠퍼스 셔틀버스")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
-                        .padding(.bottom, 18)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.65))
+                        .padding(.bottom, 14)
                 }
             }
-            .frame(height: 180)
+            .frame(height: 160)
 
-            // 빠른 링크 - 4개 아이콘
-            HStack(spacing: 10) {
+            // 빠른 링크 - 4개 아이콘 (크기 최적화)
+            HStack(spacing: 8) {
                 QuickLinkButton(
                     icon: "graduationcap.fill",
                     title: "포털",
@@ -486,7 +566,7 @@ struct KUWidgetView: View {
     }
 }
 
-// 바로가기 링크 버튼 - 애플스러운 디자인
+// 바로가기 링크 버튼 - 애플스러운 디자인 (최적화된 크기)
 struct QuickLinkButton: View {
     let icon: String
     let title: String
@@ -500,27 +580,28 @@ struct QuickLinkButton: View {
                 NSWorkspace.shared.open(url)
             }
         }) {
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 // 아이콘
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(color)
-                    .frame(width: 48, height: 48)
+                    .frame(width: 42, height: 42)
                     .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(color.opacity(isHovering ? 0.2 : 0.15))
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .fill(color.opacity(isHovering ? 0.22 : 0.16))
                     )
 
                 // 타이틀
                 Text(title)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.white)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 4)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(isHovering ? Color.white.opacity(0.06) : Color.clear)
             )
         }
@@ -530,7 +611,7 @@ struct QuickLinkButton: View {
                 isHovering = hovering
             }
         }
-        .scaleEffect(isHovering ? 1.08 : 1.0)
+        .scaleEffect(isHovering ? 1.06 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
     }
 }
@@ -586,6 +667,11 @@ struct TrayView: View {
         .onDrop(of: [.fileURL], isTargeted: $isDragging) { providers in
             handleDrop(providers: providers)
             return true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AddFileToTray"))) { notification in
+            if let url = notification.userInfo?["url"] as? URL {
+                trayManager.addItem(url: url)
+            }
         }
     }
 
@@ -694,4 +780,153 @@ struct PlaceholderView: View {
 struct SpectrumView: View {
     var isPlaying: Bool; let barCount = 20
     var body: some View { HStack(spacing: 3) { ForEach(0..<barCount, id: \.self) { i in WaveBar(isPlaying: isPlaying, delay: Double(i) * 0.05, maxHeight: 24, minHeight: 4) } } }
+}
+
+// MARK: - 설정 뷰
+struct SettingsView: View {
+    @ObservedObject var settingsManager: SettingsManager
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 헤더
+            HStack {
+                Text("노치 설정")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.primary)
+
+                Spacer()
+
+                Button(action: {
+                    isPresented = false
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.gray)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+            .background(Color(NSColor.windowBackgroundColor))
+
+            Divider()
+
+            // 설정 콘텐츠
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    // 노치 크기 설정
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("노치 크기")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.primary)
+
+                        // 가로 크기
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("가로 (너비)")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.secondary)
+
+                                Spacer()
+
+                                Text("\(Int(settingsManager.notchWidth)) pt")
+                                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.primary)
+                            }
+
+                            Slider(value: $settingsManager.notchWidth, in: 400...700, step: 10)
+                                .accentColor(.blue)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(NSColor.controlBackgroundColor))
+                        )
+
+                        // 세로 크기
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("세로 (높이)")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.secondary)
+
+                                Spacer()
+
+                                Text("\(Int(settingsManager.notchHeight)) pt")
+                                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.primary)
+                            }
+
+                            Slider(value: $settingsManager.notchHeight, in: 200...400, step: 10)
+                                .accentColor(.blue)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(NSColor.controlBackgroundColor))
+                        )
+                    }
+
+                    // 미리보기
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("미리보기")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.primary)
+
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color.black)
+                                .frame(
+                                    width: settingsManager.notchWidth / 2,
+                                    height: settingsManager.notchHeight / 2
+                                )
+                                .shadow(color: .black.opacity(0.3), radius: 10)
+
+                            Text("\(Int(settingsManager.notchWidth)) × \(Int(settingsManager.notchHeight))")
+                                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                .foregroundColor(.white)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(NSColor.controlBackgroundColor))
+                        )
+                    }
+
+                    // 리셋 버튼
+                    Button(action: {
+                        withAnimation(.spring()) {
+                            settingsManager.resetToDefaults()
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("기본값으로 복원")
+                        }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.blue.opacity(0.1))
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    // 설명
+                    Text("노치의 가로 및 세로 크기를 조정할 수 있습니다. 변경 사항은 즉시 적용됩니다.")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .padding(.top, 8)
+                }
+                .padding()
+            }
+        }
+        .frame(width: 450, height: 550)
+        .background(Color(NSColor.windowBackgroundColor))
+    }
 }
