@@ -13,6 +13,7 @@
 		A9F4A2172EE5F744000A0C7D /* MediaObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F4A2162EE5F744000A0C7D /* MediaObserver.swift */; };
 		A9F4A2192EE5F754000A0C7D /* ShuttleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F4A2182EE5F754000A0C7D /* ShuttleManager.swift */; };
 		A9F4A21B2EE5F765000A0C7D /* TrayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F4A21A2EE5F765000A0C7D /* TrayManager.swift */; };
+		A9F4A21E2EE5F776000A0C7D /* SettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9F4A21D2EE5F776000A0C7D /* SettingsManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -42,6 +43,7 @@
 		A9F4A2182EE5F754000A0C7D /* ShuttleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShuttleManager.swift; sourceTree = "<group>"; };
 		A9F4A21A2EE5F765000A0C7D /* TrayManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrayManager.swift; sourceTree = "<group>"; };
 		A9F4A21C2EE5F7E1000A0C7D /* KUS_Dynamic_Nortch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KUS_Dynamic_Nortch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A9F4A21D2EE5F776000A0C7D /* SettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,6 +80,7 @@
 				A9F4A2162EE5F744000A0C7D /* MediaObserver.swift */,
 				A9F4A2182EE5F754000A0C7D /* ShuttleManager.swift */,
 				A9F4A21A2EE5F765000A0C7D /* TrayManager.swift */,
+				A9F4A21D2EE5F776000A0C7D /* SettingsManager.swift */,
 				A9F4A21C2EE5F7E1000A0C7D /* KUS_Dynamic_Nortch.app */,
 			);
 			sourceTree = "<group>";
@@ -224,6 +227,7 @@
 				A9F4A2172EE5F744000A0C7D /* MediaObserver.swift in Sources */,
 				A9F4A2112EE5F715000A0C7D /* ContentView.swift in Sources */,
 				A9F4A21B2EE5F765000A0C7D /* TrayManager.swift in Sources */,
+				A9F4A21E2EE5F776000A0C7D /* SettingsManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
