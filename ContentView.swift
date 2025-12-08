@@ -16,17 +16,17 @@ struct ContentView: View {
     // 자연스러운 형태 변형을 위한 네임스페이스
     @Namespace private var animation
     
-    // NotchNook 스타일의 부드럽고 자연스러운 애니메이션
+    // NotchNook 스타일의 확장 애니메이션 - 더 유기적이고 자연스럽게
     var expandAnimation: Animation {
-        .spring(response: 0.6, dampingFraction: 0.75, blendDuration: 0.1)
+        .interpolatingSpring(mass: 1.0, stiffness: 180, damping: 20, initialVelocity: 0)
     }
 
     var collapseAnimation: Animation {
-        .spring(response: 0.5, dampingFraction: 0.8, blendDuration: 0)
+        .interpolatingSpring(mass: 0.8, stiffness: 200, damping: 22, initialVelocity: 0)
     }
 
-    var contentAnimation: Animation {
-        .spring(response: 0.7, dampingFraction: 0.8, blendDuration: 0)
+    var contentFadeAnimation: Animation {
+        .easeOut(duration: 0.25)
     }
     
     var body: some View {
@@ -88,22 +88,22 @@ struct ContentView: View {
                             media: mediaObserver,
                             animation: animation
                         )
-                        // 콘텐츠가 자연스럽게 나타나도록 페이드 + 스케일 적용
                         .transition(
                             .asymmetric(
-                                insertion: .scale(scale: 0.95).combined(with: .opacity)
-                                    .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.05)),
-                                removal: .scale(scale: 0.98).combined(with: .opacity)
-                                    .animation(.spring(response: 0.4, dampingFraction: 0.9))
+                                insertion: .opacity
+                                    .animation(.easeIn(duration: 0.2).delay(0.1)),
+                                removal: .opacity
+                                    .animation(.easeOut(duration: 0.15))
                             )
                         )
                     } else {
                         CompactBar(media: mediaObserver, animation: animation)
                             .transition(
                                 .asymmetric(
-                                    insertion: .scale(scale: 0.9).combined(with: .opacity)
-                                        .animation(.spring(response: 0.5, dampingFraction: 0.8)),
-                                    removal: .opacity.animation(.easeOut(duration: 0.15))
+                                    insertion: .opacity
+                                        .animation(.easeIn(duration: 0.2)),
+                                    removal: .opacity
+                                        .animation(.easeOut(duration: 0.1))
                                 )
                             )
                     }
@@ -194,29 +194,32 @@ struct CompactBar: View {
     }
 }
 
-// MARK: - 2. 확장 상태 (ExpandedDashboard) - [레이아웃 수정됨]
+// MARK: - 2. 확장 상태 (ExpandedDashboard) - [탭 고정 & 스크롤 가능]
 struct ExpandedDashboard: View {
     @Binding var isExpanded: Bool
     @Binding var selectedTab: NotchTab
     @ObservedObject var media: MediaObserver
     var animation: Namespace.ID
-    
+
     var body: some View {
         VStack(spacing: 0) {
-            // [고정] 상단 탭 네비게이션
-            // 상단바가 절대 밀리지 않도록 고정 높이 부여
+            // [고정] 상단 탭 네비게이션 - 항상 상단에 고정
             HStack {
                 HStack(spacing: 5) {
                     ForEach(NotchTab.allCases, id: \.self) { tab in
-                        Button(action: { withAnimation { selectedTab = tab } }) {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                selectedTab = tab
+                            }
+                        }) {
                             Text(tab.rawValue)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(selectedTab == tab ? .white : .gray)
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 12)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(selectedTab == tab ? .white : .gray.opacity(0.7))
+                                .padding(.vertical, 7)
+                                .padding(.horizontal, 14)
                                 .background(
                                     Capsule()
-                                        .fill(selectedTab == tab ? Color.white.opacity(0.2) : Color.clear)
+                                        .fill(selectedTab == tab ? Color.white.opacity(0.15) : Color.clear)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -224,29 +227,34 @@ struct ExpandedDashboard: View {
                 }
                 Spacer()
             }
-            .padding(20)
-            .frame(height: 60) // 상단바 높이 고정
-            
-            // [유동] 탭별 콘텐츠 영역
-            // 아래쪽으로 확장되도록 Spacer나 Frame 조정 필요 없음 (VStack이라 자동 배치)
-            ZStack {
-                if selectedTab == .app {
-                    if media.isPlaying || !media.title.isEmpty {
-                        MediaPlayerView(media: media, animation: animation)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+            .background(Color.black) // 배경 추가로 콘텐츠가 겹치지 않도록
+            .zIndex(10) // 항상 위에 표시
+
+            // [스크롤 가능] 탭별 콘텐츠 영역
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    if selectedTab == .app {
+                        if media.isPlaying || !media.title.isEmpty {
+                            MediaPlayerView(media: media, animation: animation)
+                                .padding(.top, 8)
+                        } else {
+                            PlaceholderView(icon: "music.note.list", text: "재생 중인 미디어 없음")
+                                .frame(height: 180)
+                        }
+                    } else if selectedTab == .tray {
+                        TrayView()
+                            .frame(minHeight: 200)
                     } else {
-                        PlaceholderView(icon: "music.note.list", text: "재생 중인 미디어 없음")
+                        KUWidgetView()
+                            .padding(.top, 8)
                     }
-                } else if selectedTab == .tray {
-                    TrayView()
-                } else {
-                    // [변경] 디자인이 수정된 고려대 위젯
-                    KUWidgetView()
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.horizontal, 24)
-            .padding(.bottom, 24)
         }
     }
 }
@@ -320,125 +328,157 @@ struct MediaPlayerView: View {
     }
 }
 
-// MARK: - 4. [수정됨] 고려대학교 셔틀버스 위젯 (Dark Theme)
+// MARK: - 4. [완전 재디자인] 고려대학교 위젯 - 애플스럽고 가시성 극대화
 struct KUWidgetView: View {
     @StateObject private var shuttleManager = ShuttleManager()
     @State private var direction: ShuttleManager.Direction = .toStation
     let timer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
-    // 고려대 크림슨 컬러 그라데이션 (카드용)
-    let kuGradient = LinearGradient(
-        colors: [Color(red: 136/255, green: 0, blue: 0), Color(red: 180/255, green: 30, blue: 30)],
-        startPoint: .topLeading, endPoint: .bottomTrailing
-    )
+    // 고려대 크림슨 컬러
+    let kuRed = Color(red: 152/255, green: 30/255, blue: 50/255)
 
     var body: some View {
-        VStack(spacing: 16) {
-            // 상단: 셔틀버스 정보
-            HStack(spacing: 0) {
-                // [카드 영역] 시간 정보
-                ZStack {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(kuGradient) // 카드 배경은 붉은색
-                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                        .shadow(color: Color(red: 136/255, green: 0, blue: 0).opacity(0.4), radius: 10, x: 0, y: 5)
+        VStack(spacing: 14) {
+            // 메인 셔틀버스 카드 - 가시성 최우선
+            ZStack {
+                // 배경 그라데이션
+                LinearGradient(
+                    colors: [kuRed, kuRed.opacity(0.85)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .cornerRadius(20)
+                .shadow(color: kuRed.opacity(0.3), radius: 12, x: 0, y: 6)
 
-                    VStack(spacing: 0) {
-                        // 헤더
-                        HStack {
-                            Image(systemName: "bus.fill").font(.system(size: 16)).foregroundColor(.white.opacity(0.9))
-                            Text("Shuttle").font(.system(size: 12, weight: .bold)).foregroundColor(.white.opacity(0.8)).textCase(.uppercase)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 20).padding(.top, 20)
+                VStack(spacing: 12) {
+                    // 상단: 아이콘 + 방향 선택
+                    HStack {
+                        // 버스 아이콘
+                        Image(systemName: "bus.fill")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(10)
+                            .background(Color.white.opacity(0.2))
+                            .clipShape(Circle())
 
                         Spacer()
 
-                        // 남은 시간
-                        if shuttleManager.isServiceEnded {
-                            Text("운행종료").font(.system(size: 28, weight: .bold)).foregroundColor(.white)
-                        } else {
-                            HStack(alignment: .lastTextBaseline, spacing: 4) {
-                                Text(shuttleManager.timeRemaining.replacingOccurrences(of: "분", with: ""))
-                                    .font(.system(size: 48, weight: .heavy, design: .rounded))
-                                    .foregroundColor(.white)
-                                if shuttleManager.timeRemaining.contains("분") {
-                                    Text("min").font(.system(size: 18, weight: .bold)).foregroundColor(.white.opacity(0.8)).padding(.bottom, 6)
+                        // 방향 선택 Picker
+                        Menu {
+                            Button(action: {
+                                withAnimation(.spring()) {
+                                    direction = .toStation
+                                    shuttleManager.updateNextBus(direction: .toStation)
+                                }
+                            }) {
+                                HStack {
+                                    Text("학교 ➔ 조치원역")
+                                    if direction == .toStation {
+                                        Image(systemName: "checkmark")
+                                    }
                                 }
                             }
-                        }
 
-                        // 출발 시간
-                        HStack {
-                            Image(systemName: "clock.fill").font(.system(size: 12))
-                            Text(shuttleManager.isServiceEnded ? "내일 첫차" : "\(shuttleManager.nextBusTime) 출발")
-                                .font(.system(size: 14, weight: .medium))
-                        }
-                        .foregroundColor(.white.opacity(0.9)).padding(.bottom, 20)
-                    }
-                }
-                .frame(width: 200, height: 160)
-
-                // [컨트롤 영역] 방향 전환 (Dark Theme 적용: 글자색 흰색)
-                VStack(alignment: .leading, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("세종캠퍼스").font(.system(size: 14, weight: .semibold)).foregroundColor(.white)
-                        Text("셔틀버스 도착").font(.caption).foregroundColor(.gray)
-                    }
-
-                    Divider().background(Color.white.opacity(0.3))
-
-                    VStack(spacing: 10) {
-                        DirectionButton(title: "학교 ➔ 조치원역", isSelected: direction == .toStation) {
-                            withAnimation(.spring()) {
-                                direction = .toStation
-                                shuttleManager.updateNextBus(direction: .toStation)
+                            Button(action: {
+                                withAnimation(.spring()) {
+                                    direction = .toSchool
+                                    shuttleManager.updateNextBus(direction: .toSchool)
+                                }
+                            }) {
+                                HStack {
+                                    Text("조치원역 ➔ 학교")
+                                    if direction == .toSchool {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
                             }
-                        }
-                        DirectionButton(title: "조치원역 ➔ 학교", isSelected: direction == .toSchool) {
-                            withAnimation(.spring()) {
-                                direction = .toSchool
-                                shuttleManager.updateNextBus(direction: .toSchool)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(direction == .toStation ? "조치원역 방면" : "학교 방면")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 10, weight: .semibold))
                             }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(Color.white.opacity(0.2))
+                            .cornerRadius(20)
                         }
                     }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 18)
+
+                    Spacer()
+
+                    // 중앙: 남은 시간 (매우 크고 명확하게)
+                    if shuttleManager.isServiceEnded {
+                        VStack(spacing: 4) {
+                            Text("운행종료")
+                                .font(.system(size: 36, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                            Text("내일 첫차를 이용해주세요")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                    } else {
+                        VStack(spacing: 2) {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(shuttleManager.timeRemaining.replacingOccurrences(of: "분", with: ""))
+                                    .font(.system(size: 64, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                                if shuttleManager.timeRemaining.contains("분") {
+                                    Text("분")
+                                        .font(.system(size: 28, weight: .semibold))
+                                        .foregroundColor(.white.opacity(0.9))
+                                }
+                            }
+                            Text("\(shuttleManager.nextBusTime) 출발")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.white.opacity(0.85))
+                        }
+                    }
+
+                    Spacer()
+
+                    // 하단: 세종캠퍼스 라벨
+                    Text("세종캠퍼스 셔틀버스")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .padding(.bottom, 18)
                 }
-                .padding(.leading, 20).padding(.vertical, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(height: 180)
 
-            // 하단: 바로가기 링크
-            VStack(alignment: .leading, spacing: 8) {
-                Text("빠른 링크")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.gray)
-                    .padding(.horizontal, 4)
+            // 빠른 링크 - 4개 아이콘
+            HStack(spacing: 10) {
+                QuickLinkButton(
+                    icon: "graduationcap.fill",
+                    title: "포털",
+                    url: "https://portal.korea.ac.kr",
+                    color: .blue
+                )
 
-                HStack(spacing: 12) {
-                    QuickLinkButton(
-                        icon: "graduationcap.fill",
-                        title: "포털",
-                        url: "https://portal.korea.ac.kr"
-                    )
+                QuickLinkButton(
+                    icon: "book.fill",
+                    title: "LMS",
+                    url: "https://kulms.korea.ac.kr",
+                    color: .green
+                )
 
-                    QuickLinkButton(
-                        icon: "book.fill",
-                        title: "LMS",
-                        url: "https://kulms.korea.ac.kr"
-                    )
+                QuickLinkButton(
+                    icon: "building.columns.fill",
+                    title: "도서관",
+                    url: "https://library.korea.ac.kr",
+                    color: .orange
+                )
 
-                    QuickLinkButton(
-                        icon: "building.columns.fill",
-                        title: "도서관",
-                        url: "https://library.korea.ac.kr"
-                    )
-
-                    QuickLinkButton(
-                        icon: "calendar",
-                        title: "학사일정",
-                        url: "https://www.korea.ac.kr/mbshome/mbs/university/subview.do?id=university_010701000000"
-                    )
-                }
+                QuickLinkButton(
+                    icon: "calendar",
+                    title: "학사일정",
+                    url: "https://www.korea.ac.kr/mbshome/mbs/university/subview.do?id=university_010701000000",
+                    color: .purple
+                )
             }
         }
         .onAppear { shuttleManager.updateNextBus(direction: direction) }
@@ -446,11 +486,12 @@ struct KUWidgetView: View {
     }
 }
 
-// 바로가기 링크 버튼
+// 바로가기 링크 버튼 - 애플스러운 디자인
 struct QuickLinkButton: View {
     let icon: String
     let title: String
     let url: String
+    let color: Color
     @State private var isHovering = false
 
     var body: some View {
@@ -459,29 +500,28 @@ struct QuickLinkButton: View {
                 NSWorkspace.shared.open(url)
             }
         }) {
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
+                // 아이콘
                 Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(.white)
-                    .frame(width: 40, height: 40)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(color)
+                    .frame(width: 48, height: 48)
                     .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.white.opacity(isHovering ? 0.2 : 0.1))
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(color.opacity(isHovering ? 0.2 : 0.15))
                     )
 
+                // 타이틀
                 Text(title)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white)
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isHovering ? Color.white.opacity(0.05) : Color.clear)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isHovering ? Color.white.opacity(0.3) : Color.clear, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(isHovering ? Color.white.opacity(0.06) : Color.clear)
             )
         }
         .buttonStyle(.plain)
@@ -490,26 +530,8 @@ struct QuickLinkButton: View {
                 isHovering = hovering
             }
         }
-        .scaleEffect(isHovering ? 1.05 : 1.0)
+        .scaleEffect(isHovering ? 1.08 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovering)
-    }
-}
-
-// 방향 선택 버튼 (Dark Theme)
-struct DirectionButton: View {
-    let title: String; let isSelected: Bool; let action: () -> Void
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Text(title).font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white) // 텍스트 흰색
-                Spacer()
-                if isSelected { Image(systemName: "checkmark.circle.fill").foregroundColor(.green) }
-            }
-            .padding(12)
-            .background(RoundedRectangle(cornerRadius: 12).fill(isSelected ? Color.white.opacity(0.15) : Color.white.opacity(0.05)))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? Color.white.opacity(0.5) : Color.clear, lineWidth: 1))
-        }.buttonStyle(.plain)
     }
 }
 
